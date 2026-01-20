@@ -1,0 +1,12 @@
+system: 
+  Lotka-Volterra::
+    - alpha: 1
+    - beta: 1
+    - delta: 1
+    - gamma: 1
+ansatz:
+  ULA:
+    - n_qubits: 1
+    - depth: 1
+
+
