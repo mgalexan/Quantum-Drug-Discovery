@@ -24,7 +24,7 @@ class BaseCost():
             ansatz_params: The parameters object of the ansatz circuit.
         """
     
-    def compute_cost(self, lambdas, u_prev, t) -> float:
+    def compute_cost(self, lambdas, lambdas_prev, u_prev, t) -> float:
         """
         Compute the cost value for given ansatz parameters.
 

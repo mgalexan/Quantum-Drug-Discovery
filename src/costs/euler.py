@@ -162,7 +162,6 @@ class EulerCost(BaseCost):
             for term in self.combined_circuits:
                 # find_parameters is expected to return (param_map, coeff)
                 param_map, coeff = term.find_parameters(t, u_prev)
-
                 # bind ansatz parameters and term-specific parameters (leave any other parameters alone)
                 bound_circuit = term.circuit.assign_parameters(param_map, inplace=False)
                 bound_circuit = bound_circuit.assign_parameters(ansatz_param_dict, inplace=False)
@@ -187,7 +186,7 @@ class EulerCost(BaseCost):
 # Test the EulerCost class with Lotka-Volterra equation
 if __name__ == "__main__":
     from equations.lotka_volterra import LotkaVolterra
-    from ansatz import build_ULA
+    from ansatz import ULA
 
     config = DictConfig({
         "tau": 0.1,
@@ -199,7 +198,7 @@ if __name__ == "__main__":
     # Build an ansatz
     n_qubits = 1
     depth = 1
-    ula_circuit, ula_params = build_ULA(n_qubits, depth)
+    ula_circuit, ula_params = ULA(n_qubits, depth)
 
     # Compile the cost with the ansatz
     euler_cost.compile_with_ansatz(ula_circuit, ula_params)

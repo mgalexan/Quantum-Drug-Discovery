@@ -4,7 +4,7 @@ import qiskit as qk
 from equations.base_equation import Equation
 from qiskit.circuit import ParameterVector
 
-def build_ULA(n_qubits: int, depth: int) -> qk.QuantumCircuit:
+def ULA(n_qubits: int, depth: int) -> qk.QuantumCircuit:
     """
     Build a Parametric Unitary Layered Ansatz (ULA) quantum circuit.
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     depth = 1
     param_vals = np.random.rand(depth, n_qubits, 3) * 2 * np.pi
 
-    ula_circuit, params = build_ULA(n_qubits, depth)
+    ula_circuit, params = ULA(n_qubits, depth)
     param_map = {params[i]: param_vals.flatten()[i] for i in range(len(params))}
     ula_circuit = ula_circuit.assign_parameters(param_map, inplace=False)
 
