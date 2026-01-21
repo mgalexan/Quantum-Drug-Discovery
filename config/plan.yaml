@@ -16,5 +16,5 @@ cost:
 
 initial_conditions: [0.8, 0.6]
 
- 
+workers: 1
 

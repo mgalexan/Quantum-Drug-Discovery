@@ -6,6 +6,7 @@ import numpy as np
 import nevergrad as ng
 from functools import partial
 
+
 # Import all specific instances
 from costs.euler import EulerCost
 
@@ -42,6 +43,8 @@ class QuantumForward():
         self.tau = cost_params.tau
 
         self.initial_conditions = np.array(cfg.initial_conditions)
+
+        self.workers = cfg.get("workers", 1)
 
         self._compile()
     
@@ -92,11 +95,10 @@ class QuantumForward():
         # Cost function at current step
         cost_step = partial(self.cost.compute_cost, lambdas_prev= self.current_lambdas, u_prev=self.current_state, t=self.current_time)
         # Optimizer
-        optimizer = ng.optimizers.NGOpt(parametrization=len(self.current_lambdas), budget=1000)
+        optimizer = ng.optimizers.NGOpt(parametrization=len(self.current_lambdas), budget=1000, num_workers=self.workers)
 
         # Add initial guess to previous step
         optimizer.value = self.current_lambdas
-
         result = optimizer.minimize(cost_step)
         
         self.current_lambdas = result.value
