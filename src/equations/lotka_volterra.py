@@ -25,6 +25,7 @@ class LotkaVolterra(Equation):
         self.dim = 2
         self.ode_system = self.lotka_volterra_ode
         self.gate_equiv = self.lotka_volterra_gate_equiv
+        self.var_names = ['Prey', 'Predator']
 
     def lotka_volterra_ode(self, t, u):
         """

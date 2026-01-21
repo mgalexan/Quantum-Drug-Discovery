@@ -1,20 +1,24 @@
+name: chemotherapy
+
+initial_conditions: [1.0, 0.0, 0.2, 0.0]
+optimizer_budget: 3000
+n_steps: 100
+
 equation: 
-  LotkaVolterra:
-    alpha: 1
-    beta: 1
-    delta: 1
-    gamma: 1
+  Chemotherapy:
+    k_e: 0.4
+    k_e0: 0.7
+    lambda_T: 0.05
+    K_T: 1.0
+    k_max: 0.3
+    EC50: 0.3
 ansatz:
   ULA:
-    n_qubits: 1
-    depth: 1
+    n_qubits: 2
+    depth: 2
 
 cost:
   EulerCost:
-    tau: 0.002
+    tau: 0.02
     backend_type: exact
-
-initial_conditions: [0.8, 0.6]
-
-workers: 1
 

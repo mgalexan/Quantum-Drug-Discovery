@@ -17,6 +17,31 @@ class Equation():
         self.gate_equiv = None
         self.name = "Generic Equation"
         self.dim = 0
+        self.var_names = []
+    
+    def plot_results(self, t, u, name=None, u_num=None):
+        """
+        Plot the results of the ODE system.
+
+        Args:
+            t (array-like): Time points.
+            u (array-like): Solution array.
+        """
+        import matplotlib.pyplot as plt
+
+        for i in range(self.dim):
+            if self.var_names and self.var_names[i]:
+                label = f'Quantum {self.var_names[i]}'
+                vals = [u_step[i] for u_step in u]
+                plt.plot(t, vals, label=label)
+                if u_num is not None:
+                    label = f'Numerical {self.var_names[i]}'
+                    plt.plot(t, u_num[i], label=label)   
+        plt.xlabel('Time')
+        plt.ylabel('Variables')
+        plt.title(f'Solution of {self.name} ODE System')
+        plt.legend()
+        plt.savefig(name if name else f'{self.name}_solution.png')
 
 class QuantumTerm():
     """A class to represent a quantum term in the cost function with its circuit and normalization coefficient."""

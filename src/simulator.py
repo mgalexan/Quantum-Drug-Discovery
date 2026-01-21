@@ -13,6 +13,7 @@ from costs.euler import EulerCost
 from ansatz import ULA
 
 from equations.lotka_volterra import LotkaVolterra
+from equations.chemotherapy import Chemotherapy
 
 
 
@@ -45,6 +46,7 @@ class QuantumForward():
         self.initial_conditions = np.array(cfg.initial_conditions)
 
         self.workers = cfg.get("workers", 1)
+        self.optimizer_budget = cfg.get("optimizer_budget", 1000)
 
         self._compile()
     
@@ -76,7 +78,7 @@ class QuantumForward():
             statevector = op.data[:, 0]
             cost = np.linalg.norm(statevector - u0_normalized) ** 2
             return cost
-        optimizer = ng.optimizers.NGOpt(parametrization=len(self.ansatz_params), budget=1000)
+        optimizer = ng.optimizers.NGOpt(parametrization=len(self.ansatz_params), budget=self.optimizer_budget)
         ic_result = optimizer.minimize(_ic_cost)
         self.ic_lambdas = [lambda_0] + list(ic_result.value)
         self.current_lambdas = self.ic_lambdas
@@ -95,7 +97,7 @@ class QuantumForward():
         # Cost function at current step
         cost_step = partial(self.cost.compute_cost, lambdas_prev= self.current_lambdas, u_prev=self.current_state, t=self.current_time)
         # Optimizer
-        optimizer = ng.optimizers.NGOpt(parametrization=len(self.current_lambdas), budget=1000, num_workers=self.workers)
+        optimizer = ng.optimizers.NGOpt(parametrization=len(self.current_lambdas), budget=self.optimizer_budget, num_workers=self.workers)
 
         # Add initial guess to previous step
         optimizer.value = self.current_lambdas
