@@ -66,9 +66,16 @@ class EulerCost(BaseCost):
             term_targets = list(range(term_nq))
             combined = combined.compose(term.circuit, qubits=term_targets, inplace=False)
 
-            # Compose the adjoint ansatz onto the first n_system_qubits qubits
-            combined = combined.compose(self.ansatz_prev.inverse(), qubits=ansatz_targets, inplace=False)
-            self.combined_circuits.append(QuantumTerm(combined, term.find_parameters))
+            # If Linear, compose the adjoint ansatz onto the first n_system_qubits qubits
+            if term.gate_type == "linear":
+                combined = combined.compose(self.ansatz_prev.inverse(), qubits=ansatz_targets, inplace=False)
+            
+            # If Constant, compose instead with the Hadamard on the ansatz
+            elif term.gate_type == "constant":
+                for q in ansatz_targets:
+                    combined.h(q)
+            
+            self.combined_circuits.append(QuantumTerm(combined, term.find_parameters, term.gate_type))
 
             hadamard_test = qk.QuantumCircuit(total_qubits + 1, 1)
             # ancilla at qubit 0
@@ -83,7 +90,7 @@ class EulerCost(BaseCost):
             # Transpile before running
             hadamard_test = qk.transpile(hadamard_test, self.backend)
 
-            self.hadamard_circuits.append(QuantumTerm(hadamard_test, term.find_parameters))
+            self.hadamard_circuits.append(QuantumTerm(hadamard_test, term.find_parameters, term.gate_type))
         
         # We also need the pure inner product of current and previous ansatz states
         self.inner_product_circuit_hadamard = qk.QuantumCircuit(n_system_qubits + 1, 1)
@@ -120,10 +127,18 @@ class EulerCost(BaseCost):
                 # find_parameters is expected to return (param_map, coeff)
                 param_map, coeff = term.find_parameters(t, u_prev)
 
+                if term.gate_type == "constant":
+                    # Previous timestep Ansatz 
+                    n_system_qubits = int(np.log2(self.equation.dim))
+                    coeff *= (np.sqrt(2) ** n_system_qubits) / lambda_prev_0
+
                 # bind ansatz parameters and term-specific parameters (leave any other parameters alone)
                 bound_circuit = term.circuit.assign_parameters(param_map, inplace=False)
-                bound_circuit = bound_circuit.assign_parameters(ansatz_param_dict, inplace=False)
-                bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
+                if term.gate_type == "linear":
+                    bound_circuit = bound_circuit.assign_parameters(ansatz_param_dict, inplace=False)
+                    bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
+                elif term.gate_type == "constant":
+                    bound_circuit = bound_circuit.assign_parameters(ansatz_param_dict, inplace=False)
 
                 job = self.backend.run(bound_circuit, shots=8192)
                 result = job.result()
@@ -162,16 +177,24 @@ class EulerCost(BaseCost):
             for term in self.combined_circuits:
                 # find_parameters is expected to return (param_map, coeff)
                 param_map, coeff = term.find_parameters(t, u_prev)
+
+                if term.gate_type == "constant":
+                    # Previous timestep Ansatz 
+                    n_system_qubits = int(np.log2(self.equation.dim))
+                    coeff *= (np.sqrt(2) ** n_system_qubits) / lambda_prev_0
+
                 # bind ansatz parameters and term-specific parameters (leave any other parameters alone)
-                bound_circuit = term.circuit.assign_parameters(param_map, inplace=False)
+                bound_circuit = term.circuit.assign_parameters(param_map, inplace=False)   
                 bound_circuit = bound_circuit.assign_parameters(ansatz_param_dict, inplace=False)
-                bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
+                if term.gate_type == "linear":
+                    bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
 
                 # Get the unitary matrix
                 unitary = qk.quantum_info.Operator(bound_circuit).data
 
                 # The expectation value is the real part of the top-left element
                 expectation = np.real(unitary[0, 0])
+                #print(expectation)
                 cost += self.tau * coeff * expectation
 
             # Inner product circuit
@@ -183,9 +206,9 @@ class EulerCost(BaseCost):
         cost = lambda_0**2 - 2 * lambda_0 * lambda_prev_0 * cost
         return cost
 
-# Test the EulerCost class with Lotka-Volterra equation
+# Test the EulerCost class with Cytokine equation
 if __name__ == "__main__":
-    from equations.lotka_volterra import LotkaVolterra
+    from equations.cytokine import Cytokine
     from ansatz import ULA
 
     config = DictConfig({
@@ -193,37 +216,38 @@ if __name__ == "__main__":
         "backend_type": "exact"
     })
     # Define the equation and cost
-    lv_equation = LotkaVolterra()
-    euler_cost = EulerCost(lv_equation, config)
-    # Build an ansatz
-    n_qubits = 1
-    depth = 1
+    cytokine = Cytokine()
+    euler_cost = EulerCost(cytokine, config)
+    # Build an ansatz with 2 qubits to match 4D system
+    n_qubits = 2
+    depth = 2
     ula_circuit, ula_params = ULA(n_qubits, depth)
 
     # Compile the cost with the ansatz
     euler_cost.compile_with_ansatz(ula_circuit, ula_params)
 
     # Plot term circuits
-    lambdas = [5] + [np.random.rand() * np.pi / 2 for _ in range(len(ula_params))]
-    lambdas_prev = [5] + [np.random.rand() * np.pi / 2 for _ in range(len(ula_params))]
+    lambdas = [1] + [0 for _ in range(len(ula_params))]
+    lambdas_prev = [np.float64(1.0099504938362078), np.float64(-0.31429905407424163), np.float64(1.6585201760744779), np.float64(-0.4956649235018435), np.float64(-1.6819061548689396), np.float64(3.5410765740049257), np.float64(-1.504565823095785), np.float64(-0.09570568336937833), np.float64(1.4738527303154714), np.float64(-0.16370283990172077), np.float64(-0.844127275348244), np.float64(1.5722675983772583), np.float64(1.23068705548804)]
+    
     for i, term in enumerate(euler_cost.combined_circuits):
         circuit = term.circuit
-        params, coeff = term.find_parameters(0.0, np.array([5.0, 2.0]))
+        # Use Cytokine initial state for testing
+        params, coeff = term.find_parameters(0.0, np.array([0.1, 1.0, 0.0, 0.1]))
         param_map = {ula_params[j]: lambdas[j + 1] for j in range(len(ula_params))}
         param_map_prev = {euler_cost.ansatz_prev_params[j]: lambdas_prev[j + 1] for j in range(len(ula_params))}
         circuit = circuit.assign_parameters(param_map, inplace=False)
         circuit = circuit.assign_parameters(params, inplace=False)
-        circuit = circuit.assign_parameters(param_map_prev, inplace=False)
+        if term.gate_type == "linear":
+            circuit = circuit.assign_parameters(param_map_prev, inplace=False)
         circuit.draw('mpl', style={'fontsize': 8}).savefig(f"euler_cost_term_{i}.png")
-        circuit_h = euler_cost.hadamard_circuits[i].circuit
-        circuit_h = circuit_h.assign_parameters(param_map, inplace=False)
-        circuit_h = circuit_h.assign_parameters(params, inplace=False)
-        circuit_h = circuit_h.assign_parameters(param_map_prev, inplace=False)
-        circuit_h.draw('mpl', style={'fontsize': 8}).savefig(f"euler_cost_hadamard_term_{i}.png")
+        print(f"Term {i} ({term.gate_type}): coeff = {coeff}")
+        print(qk.quantum_info.Operator(circuit).data.round(2))
 
-    # Define test parameters and previous state
-    
+    # Define test parameters and previous state using Cytokine initial conditions
     t = 0.0
+    u_prev = np.array([0.1, 1.0, 0.0, 0.1])  # [T, H, D, C]
+    
     # Compute the cost
-    cost_value = euler_cost.compute_cost(lambdas, lambdas_prev, t, np.array([5.0, 2.0]))
-    print(f"Computed Euler cost: {cost_value}")
+    cost_value = euler_cost.compute_cost(lambdas, lambdas_prev, t, u_prev)
+    print(f"\nComputed Euler cost for Cytokine system: {cost_value}")

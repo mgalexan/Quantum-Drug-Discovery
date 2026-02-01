@@ -53,6 +53,41 @@ class LotkaVolterra(Equation):
             QuantumTerm(diag_circuit_1, lambda t, u: find_diagonal_parameters(u * np.array([-self.beta, self.delta]), thetas_1)),
             QuantumTerm(diag_circuit_2, lambda t, u: find_diagonal_parameters(np.array([self.alpha, -self.gamma]), thetas_2))
             ]
+    
+class LotkaVolterraConstant(LotkaVolterra):
+    """Lotka-Volterra with a Constant for testing"""
+    def lotka_volterra_ode(self, t, u):
+        """
+        Lotka-Volterra ODE system in a scipy format.
+        """
+        x, y = u
+        dudt = [self.alpha * x + self.alpha - self.beta * x * y,
+                self.delta * x * y - self.gamma * y]
+        return dudt
+    
+    def lotka_volterra_gate_equiv(self):
+        """
+        Get the quantum gate equivalent for the Lotka-Volterra system.
+        """
+        # Quantum term for the nonlinear parts
+        diag_circuit_1, thetas_1 = make_parameterized_diagonal_circuit(n_qubits=1)
+        
+        # Add a Pauli-X
+        diag_circuit_1.x(0)
+
+        # Quantum term for the linear parts
+        diag_circuit_2, thetas_2 = make_parameterized_diagonal_circuit(n_qubits=1)
+
+        diag_circuit_3, thetas_3 = make_parameterized_diagonal_circuit(n_qubits=1)
+
+        return [
+            QuantumTerm(diag_circuit_1, lambda t, u: find_diagonal_parameters(u * np.array([-self.beta, self.delta]), thetas_1)),
+            QuantumTerm(diag_circuit_2, lambda t, u: find_diagonal_parameters(np.array([self.alpha, -self.gamma]), thetas_2)),
+            QuantumTerm(diag_circuit_3, lambda t, u: find_diagonal_parameters(np.array([self.alpha / u[0], 0]), thetas_3), "linear")
+            #QuantumTerm(diag_circuit_3, lambda t, u: find_diagonal_parameters(np.array([self.alpha, 0]), thetas_3), "constant")
+
+            ]
+
 
 # test the Lotka-Volterra equation
 if __name__ == "__main__":

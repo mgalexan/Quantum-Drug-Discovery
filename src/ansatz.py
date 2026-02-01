@@ -41,15 +41,29 @@ def ULA(n_qubits: int, depth: int) -> qk.QuantumCircuit:
 
 
 
-# test plotting the circuit
+# test plotting the circuit with Cytokine system
 if __name__ == "__main__":
-    n_qubits = 1
+    from equations.cytokine import Cytokine
+    
+    n_qubits = 2
     depth = 1
     param_vals = np.random.rand(depth, n_qubits, 3) * 2 * np.pi
 
     ula_circuit, params = ULA(n_qubits, depth)
     param_map = {params[i]: param_vals.flatten()[i] for i in range(len(params))}
-    ula_circuit = ula_circuit.assign_parameters(param_map, inplace=False)
+    ula_circuit_assigned = ula_circuit.assign_parameters(param_map, inplace=False)
 
     ula_circuit.draw('mpl', style={'fontsize': 8}).savefig("ULA.png")
-    print(qk.quantum_info.Operator(ula_circuit).data.round(2))
+    print(qk.quantum_info.Operator(ula_circuit_assigned).data.round(2))
+    
+    # Test with Cytokine system
+    cytokine = Cytokine()
+    print(f"\nCytokine system:")
+    print(f"  Name: {cytokine.name}")
+    print(f"  Dimension: {cytokine.dim}")
+    print(f"  Variables: {cytokine.var_names}")
+    
+    quantum_terms = cytokine.gate_equiv()
+    print(f"  Number of quantum terms: {len(quantum_terms)}")
+    for i, term in enumerate(quantum_terms):
+        print(f"    Term {i}: type={term.gate_type}, n_qubits={term.circuit.num_qubits}")

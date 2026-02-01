@@ -46,7 +46,7 @@ class Equation():
 class QuantumTerm():
     """A class to represent a quantum term in the cost function with its circuit and normalization coefficient."""
     
-    def __init__(self, circuit: qk.QuantumCircuit, find_parameters: callable):
+    def __init__(self, circuit: qk.QuantumCircuit, find_parameters: callable, gate_type: str = "linear"):
         """
         Initialize the quantum term.
 
@@ -56,6 +56,7 @@ class QuantumTerm():
         """
         self.circuit = circuit
         self.find_parameters = find_parameters
+        self.gate_type = gate_type
 
 
         

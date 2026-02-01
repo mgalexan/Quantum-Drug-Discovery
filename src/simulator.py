@@ -12,8 +12,9 @@ from costs.euler import EulerCost
 
 from ansatz import ULA
 
-from equations.lotka_volterra import LotkaVolterra
-from equations.chemotherapy import Chemotherapy
+from equations.lotka_volterra import LotkaVolterra, LotkaVolterraConstant
+from equations.chemotherapy import Chemotherapy, AltChemotherapy
+from equations.cytokine import Cytokine
 
 
 

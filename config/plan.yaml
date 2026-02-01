@@ -1,17 +1,28 @@
-name: chemotherapy
+name: cytokine-new
 
-initial_conditions: [1.0, 0.0, 0.2, 0.0]
-optimizer_budget: 3000
-n_steps: 100
+initial_conditions: [0.1, 1.0, 0.0, 0.1]
+optimizer_budget: 4000
+n_steps: 400
 
 equation: 
-  Chemotherapy:
-    k_e: 0.4
-    k_e0: 0.7
-    lambda_T: 0.05
+  Cytokine:
+    alpha_T: 0.05
     K_T: 1.0
-    k_max: 0.3
-    EC50: 0.3
+    alpha_H: 0.10
+    H_max: 1.0
+    beta_T: 0.1
+    gamma_T: 1.0
+    gamma_H: 0.3
+    IC50T: 0.3
+    IC50H: 0.8
+    k_a: 1.0
+    k_e: 0.3
+    k_in: 1.0
+    k_prod: 0.2
+    k_deg: 0.5
+    eta_T: 0.5
+    delta_CD: 0.2
+    dose: 1.0
 ansatz:
   ULA:
     n_qubits: 2
@@ -19,6 +30,6 @@ ansatz:
 
 cost:
   EulerCost:
-    tau: 0.02
+    tau: 0.005
     backend_type: exact
 

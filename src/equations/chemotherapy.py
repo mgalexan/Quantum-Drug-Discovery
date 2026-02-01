@@ -2,6 +2,7 @@ from equations.base_equation import Equation, QuantumTerm
 from circuit_utils import make_parameterized_diagonal_circuit, find_diagonal_parameters
 import numpy as np
 import qiskit as qk
+from scipy.optimize import least_squares
 
 
 class Chemotherapy(Equation):
@@ -70,9 +71,74 @@ class Chemotherapy(Equation):
             QuantumTerm(diag_circuit_2, find_parameters_term2)
             ]
 
+class AltChemotherapy(Chemotherapy):
+    """Alternate decomposition given by the Taylor Series"""
+    def _fit_taylor_static(self):
+        def cost(a):
+            d = np.linspace(0, 0.5, 1000)
+            cost = np.linalg.norm(a[0]*d + a[1]*d**2 + a[2]*d**3 - d / (d + self.EC50))
+            
+            return cost
+        optimizer = least_squares(cost, [0, 0, 0])
+
+        result = optimizer.x
+        
+        
+        return result[0], result[1], result[2]
+    
+    def chemotherapy_gate_equiv(self):
+
+        a_1, a_2, a_3 = self._fit_taylor_static()
+        # Quantum term for the nonlinear parts
+        diag_circuit_1, thetas_1 = make_parameterized_diagonal_circuit(n_qubits=2)
+
+        # Add a Pauli-X in the 0th qubit
+        diag_circuit_1.x(0)
+
+        # Quantum term for the linear parts
+        diag_circuit_2, thetas_2 = make_parameterized_diagonal_circuit(n_qubits=2)
+
+        # Set of three Taylor Terms
+        diag_circuit_3, thetas_3 = make_parameterized_diagonal_circuit(n_qubits=2)
+        diag_circuit_4, thetas_4 = make_parameterized_diagonal_circuit(n_qubits=2)
+        diag_circuit_5, thetas_5 = make_parameterized_diagonal_circuit(n_qubits=2)
+
+
+        def find_parameters_term1(t, u):
+            return find_diagonal_parameters(np.array([0.0, self.k_e0, 0.0, 0.0]), thetas_1)
+        def find_parameters_term2(t, u):
+            _, E, T, _ = u
+            val = self.lambda_T * (1 - T / self.K_T)
+            return find_diagonal_parameters(np.array([-self.k_e, -self.k_e0, val, 0.0]), thetas_2)
+        
+        def find_parameters_term3(t, u):
+            _, E, _, _ = u
+            return find_diagonal_parameters(np.array([0.0, 0.0, a_1 * E, 0.0]), thetas_3)
+        
+        def find_parameters_term4(t, u):
+            _, E, _, _ = u
+            return find_diagonal_parameters(np.array([0.0, 0.0, a_2 * E**2, 0.0]), thetas_4)
+        
+        def find_parameters_term5(t, u):
+            _, E, _, _ = u
+            return find_diagonal_parameters(np.array([0.0, 0.0, a_3 * E**3, 0.0]), thetas_5)
+
+        return [
+            QuantumTerm(diag_circuit_1, find_parameters_term1),
+            QuantumTerm(diag_circuit_2, find_parameters_term2),
+            QuantumTerm(diag_circuit_3, find_parameters_term3),
+            QuantumTerm(diag_circuit_4, find_parameters_term4),
+            QuantumTerm(diag_circuit_5, find_parameters_term5),
+            ]
+
+
+
+        
+
+
 # test the Chemotherapy equation
 if __name__ == "__main__":
-    chemo = Chemotherapy()
+    chemo = AltChemotherapy()
     t = 0.0
     u = np.array([2.0, 5.0, 0.5, 0.0])
     terms = chemo.chemotherapy_gate_equiv()
@@ -83,4 +149,5 @@ if __name__ == "__main__":
         print(coeff)
         print(qk.quantum_info.Operator(circuit).data.round(2)[0:4, 0:4])
 
-    
+
+ 

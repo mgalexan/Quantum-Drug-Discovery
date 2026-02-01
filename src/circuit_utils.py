@@ -41,7 +41,15 @@ def find_diagonal_parameters(
     Bind parameters so the circuit prepares the given state amplitudes.
     """
     coeff = np.linalg.norm(state)
-    state = state / coeff
+    if coeff == 0:
+        # Handle zero vector case
+        state = np.ones_like(state) / np.sqrt(len(state))
+        coeff = 1.0
+    else:
+        state = state / coeff
+    
+    # Clamp state values to [-1, 1] to avoid arccos domain errors
+    state = np.clip(state, -1.0, 1.0)
     angles = [2 * np.arccos(a) for a in state]
     param_map = dict(zip(thetas, angles))
     return param_map, coeff
