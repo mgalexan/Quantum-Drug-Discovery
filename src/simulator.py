@@ -5,6 +5,9 @@ from omegaconf import DictConfig
 import numpy as np
 import nevergrad as ng
 from functools import partial
+import warnings
+warnings.filterwarnings('ignore')
+
 
 
 # Import all specific instances
@@ -12,9 +15,10 @@ from costs.euler import EulerCost
 
 from ansatz import ULA
 
-from equations.lotka_volterra import LotkaVolterra, LotkaVolterraConstant
+from equations.lotka_volterra import LotkaVolterra, LotkaVolterraConstant, LotkaVolterraFullQuantum
 from equations.chemotherapy import Chemotherapy, AltChemotherapy
-from equations.cytokine import Cytokine
+from equations.cytokine import Cytokine, CytokineFullQuantum
+from equations.cellsignal import CellSignal
 
 
 
@@ -43,6 +47,7 @@ class QuantumForward():
         cost_params = cost_cfg[cost_name]
         self.cost: BaseCost = globals()[cost_name](self.equation, cost_params)
         self.tau = cost_params.tau
+        self.ansatz_cfg = cfg.ansatz
 
         self.initial_conditions = np.array(cfg.initial_conditions)
 
@@ -56,7 +61,7 @@ class QuantumForward():
         Compile the quantum forward evolution components.
         """
         # Compile the cost function with the ansatz
-        self.cost.compile_with_ansatz(self.ansatz, self.ansatz_params)
+        self.cost.compile_with_ansatz(self.ansatz, self.ansatz_params, self.ansatz_cfg)
 
         # Find initial conditions parameters
         lambda_0 = np.linalg.norm(self.initial_conditions)
@@ -82,6 +87,7 @@ class QuantumForward():
         optimizer = ng.optimizers.NGOpt(parametrization=len(self.ansatz_params), budget=self.optimizer_budget)
         ic_result = optimizer.minimize(_ic_cost)
         self.ic_lambdas = [lambda_0] + list(ic_result.value)
+        print(self.ic_lambdas)
         self.current_lambdas = self.ic_lambdas
 
         # Compute the first state
@@ -91,6 +97,8 @@ class QuantumForward():
         statevector = op.data[:, 0] * self.ic_lambdas[0]
         self.current_state = np.real(statevector)
         self.current_time = 0.0
+        
+
         
     
     def step(self) -> np.ndarray:

@@ -46,24 +46,13 @@ if __name__ == "__main__":
     from equations.cytokine import Cytokine
     
     n_qubits = 2
-    depth = 1
-    param_vals = np.random.rand(depth, n_qubits, 3) * 2 * np.pi
+    depth = 2
+    param_vals = [np.float64(-0.6583469210139389), np.float64(0.0906036474001978), np.float64(0.34999534869542565), np.float64(0.06590562037649081), np.float64(2.9532402842049104), np.float64(0.9346781098327449), np.float64(0.10006168426744733), np.float64(-0.20715346943428264), np.float64(-0.43228867517273106), np.float64(0.6538200986862839), np.float64(-0.1655901769577127), np.float64(-0.173943598641846)]
 
     ula_circuit, params = ULA(n_qubits, depth)
-    param_map = {params[i]: param_vals.flatten()[i] for i in range(len(params))}
+    param_map = {params[i]: param_vals[i] for i in range(len(params))}
     ula_circuit_assigned = ula_circuit.assign_parameters(param_map, inplace=False)
 
     ula_circuit.draw('mpl', style={'fontsize': 8}).savefig("ULA.png")
     print(qk.quantum_info.Operator(ula_circuit_assigned).data.round(2))
     
-    # Test with Cytokine system
-    cytokine = Cytokine()
-    print(f"\nCytokine system:")
-    print(f"  Name: {cytokine.name}")
-    print(f"  Dimension: {cytokine.dim}")
-    print(f"  Variables: {cytokine.var_names}")
-    
-    quantum_terms = cytokine.gate_equiv()
-    print(f"  Number of quantum terms: {len(quantum_terms)}")
-    for i, term in enumerate(quantum_terms):
-        print(f"    Term {i}: type={term.gate_type}, n_qubits={term.circuit.num_qubits}")

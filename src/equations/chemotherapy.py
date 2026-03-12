@@ -45,7 +45,7 @@ class Chemotherapy(Equation):
         dudt = [dCdt, dEdt, dTdt, dDdt]
         return dudt
 
-    def chemotherapy_gate_equiv(self):
+    def chemotherapy_gate_equiv(self, ansatz_cfg=None):
         """
         Get the quantum gate equivalent for the Chemotherapy system.
         """
@@ -86,7 +86,7 @@ class AltChemotherapy(Chemotherapy):
         
         return result[0], result[1], result[2]
     
-    def chemotherapy_gate_equiv(self):
+    def chemotherapy_gate_equiv(self, ansatz_cfg=None):
 
         a_1, a_2, a_3 = self._fit_taylor_static()
         # Quantum term for the nonlinear parts

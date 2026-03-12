@@ -5,6 +5,7 @@ from qiskit.circuit import ParameterVector
 from qiskit_aer import AerSimulator
 import numpy as np
 from omegaconf import DictConfig
+from collections import defaultdict
 
 class EulerCost(BaseCost):
     """Cost function based on the forward Euler method for ODE systems."""
@@ -25,13 +26,14 @@ class EulerCost(BaseCost):
             self.backend = None
 
 
-    def compile_with_ansatz(self, ansatz: qk.QuantumCircuit, ansatz_params) -> None:
+    def compile_with_ansatz(self, ansatz: qk.QuantumCircuit, ansatz_params, ansatz_cfg: DictConfig = None) -> None:
         """
         Compile the cost function with a given ansatz circuit.
 
         Args:
             ansatz (qk.QuantumCircuit): The ansatz quantum circuit to be used in the cost function.
             ansatz_params: The parameters object of the ansatz circuit.
+            ansatz_cfg (DictConfig): Configuration for the ansatz.
         """
         self.ansatz = ansatz
         self.ansatz_params = ansatz_params
@@ -40,7 +42,7 @@ class EulerCost(BaseCost):
         self.ansatz_prev_params = ParameterVector('lambda_prev', len(ansatz_params))
         self.ansatz_prev = self.ansatz_prev.assign_parameters(self.ansatz_prev_params, inplace=False)
 
-        self.quantum_terms = self.equation.gate_equiv()
+        self.quantum_terms = self.equation.gate_equiv(ansatz_cfg)
 
         # For forwards Euler, we combine the Ansatz with each quantum term on the right
         self.combined_circuits = []
@@ -67,7 +69,7 @@ class EulerCost(BaseCost):
             combined = combined.compose(term.circuit, qubits=term_targets, inplace=False)
 
             # If Linear, compose the adjoint ansatz onto the first n_system_qubits qubits
-            if term.gate_type == "linear":
+            if term.gate_type != "constant":
                 combined = combined.compose(self.ansatz_prev.inverse(), qubits=ansatz_targets, inplace=False)
             
             # If Constant, compose instead with the Hadamard on the ansatz
@@ -139,6 +141,20 @@ class EulerCost(BaseCost):
                     bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
                 elif term.gate_type == "constant":
                     bound_circuit = bound_circuit.assign_parameters(ansatz_param_dict, inplace=False)
+                elif term.gate_type == "ansatz":
+                    bound_circuit = bound_circuit.assign_parameters(ansatz_param_dict, inplace=False)
+                    bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
+                    vals = ansatz_prev_param_dict.values()
+                    by_name = defaultdict(list)
+                    for p in circuit.parameters:
+                        by_name[p.name.split("[")[0]].append(p)
+
+                    bind_dict = {}
+                    for name, params in by_name.items():
+                        if name.startswith("theta"):
+                            for p, v in zip(sorted(params, key=lambda x: x.name), vals):
+                                bind_dict[p] = v
+
 
                 job = self.backend.run(bound_circuit, shots=8192)
                 result = job.result()
@@ -182,12 +198,28 @@ class EulerCost(BaseCost):
                     # Previous timestep Ansatz 
                     n_system_qubits = int(np.log2(self.equation.dim))
                     coeff *= (np.sqrt(2) ** n_system_qubits) / lambda_prev_0
-
+                coeff *= lambda_prev_0 ** term.u_deg
                 # bind ansatz parameters and term-specific parameters (leave any other parameters alone)
                 bound_circuit = term.circuit.assign_parameters(param_map, inplace=False)   
                 bound_circuit = bound_circuit.assign_parameters(ansatz_param_dict, inplace=False)
                 if term.gate_type == "linear":
                     bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
+                if term.gate_type == "ansatz":
+                    bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
+                    vals = list(ansatz_prev_param_dict.values())
+                    
+                    by_name = defaultdict(list)
+                    for p in bound_circuit.parameters:
+                        vec_name = str(p).split('[')[0]
+                        by_name[vec_name].append(p)
+                    
+                    param_dict = {}
+                    for vec_name in sorted(by_name.keys()):
+                        for param_idx, p in enumerate(sorted(by_name[vec_name], key=lambda x: int(str(x).split('[')[1].split(']')[0]))):
+                            param_dict[p] = vals[param_idx]
+            
+                    bound_circuit = bound_circuit.assign_parameters(param_dict, inplace=False)
+
 
                 # Get the unitary matrix
                 unitary = qk.quantum_info.Operator(bound_circuit).data
@@ -205,48 +237,63 @@ class EulerCost(BaseCost):
             cost += expectation
         cost = lambda_0**2 - 2 * lambda_0 * lambda_prev_0 * cost
         return cost
-
-# Test the EulerCost class with Cytokine equation
+    
+# Test the EulerCost class with LK equation
 if __name__ == "__main__":
-    from equations.cytokine import Cytokine
+    from equations.lotka_volterra import LotkaVolterraFullQuantum
     from ansatz import ULA
 
     config = DictConfig({
         "tau": 0.1,
         "backend_type": "exact"
     })
+    ansatz_cfg = {"ULA": {"n_qubits": 1, "depth": 1}}
     # Define the equation and cost
-    cytokine = Cytokine()
-    euler_cost = EulerCost(cytokine, config)
+    lk = LotkaVolterraFullQuantum()
+    euler_cost = EulerCost(lk, config)
     # Build an ansatz with 2 qubits to match 4D system
-    n_qubits = 2
-    depth = 2
+    n_qubits = 1
+    depth = 1
     ula_circuit, ula_params = ULA(n_qubits, depth)
 
     # Compile the cost with the ansatz
-    euler_cost.compile_with_ansatz(ula_circuit, ula_params)
+    euler_cost.compile_with_ansatz(ula_circuit, ula_params, ansatz_cfg)
 
     # Plot term circuits
     lambdas = [1] + [0 for _ in range(len(ula_params))]
-    lambdas_prev = [np.float64(1.0099504938362078), np.float64(-0.31429905407424163), np.float64(1.6585201760744779), np.float64(-0.4956649235018435), np.float64(-1.6819061548689396), np.float64(3.5410765740049257), np.float64(-1.504565823095785), np.float64(-0.09570568336937833), np.float64(1.4738527303154714), np.float64(-0.16370283990172077), np.float64(-0.844127275348244), np.float64(1.5722675983772583), np.float64(1.23068705548804)]
+    lambdas_prev = [1] + [0 for _ in range(len(ula_params))]
     
     for i, term in enumerate(euler_cost.combined_circuits):
         circuit = term.circuit
         # Use Cytokine initial state for testing
-        params, coeff = term.find_parameters(0.0, np.array([0.1, 1.0, 0.0, 0.1]))
+        params, coeff = term.find_parameters(0.0, np.array([0.6, 0.8]))
         param_map = {ula_params[j]: lambdas[j + 1] for j in range(len(ula_params))}
         param_map_prev = {euler_cost.ansatz_prev_params[j]: lambdas_prev[j + 1] for j in range(len(ula_params))}
+        lambdas_vals_prev = param_map_prev.values()
         circuit = circuit.assign_parameters(param_map, inplace=False)
         circuit = circuit.assign_parameters(params, inplace=False)
-        if term.gate_type == "linear":
+        if term.gate_type != "constant":
             circuit = circuit.assign_parameters(param_map_prev, inplace=False)
+        if term.gate_type == "ansatz":
+            by_name = defaultdict(list)
+            for p in circuit.parameters:
+                vec_name = str(p).split('[')[0]
+                by_name[vec_name].append(p)
+            
+            param_dict = {}
+            for vec_name in sorted(by_name.keys()):
+                for param_idx, p in enumerate(sorted(by_name[vec_name], key=lambda x: int(str(x).split('[')[1].split(']')[0]))):
+                    param_dict[p] = lambda_vals_prev[param_idx]
+            
+            circuit = circuit.assign_parameters(param_dict, inplace=False)
+
         circuit.draw('mpl', style={'fontsize': 8}).savefig(f"euler_cost_term_{i}.png")
         print(f"Term {i} ({term.gate_type}): coeff = {coeff}")
-        print(qk.quantum_info.Operator(circuit).data.round(2))
+        print(qk.quantum_info.Operator(circuit).data.round(2)[0:2, 0:2])
 
     # Define test parameters and previous state using Cytokine initial conditions
     t = 0.0
-    u_prev = np.array([0.1, 1.0, 0.0, 0.1])  # [T, H, D, C]
+    u_prev = np.array([0.6, 0.8])  # [T, H, D, C]
     
     # Compute the cost
     cost_value = euler_cost.compute_cost(lambdas, lambdas_prev, t, u_prev)
