@@ -36,6 +36,7 @@ class QuantumForward():
         equation_name = list(equation_cfg.keys())[0]
         equation_params = equation_cfg[equation_name]
         self.equation: Equation = globals()[equation_name](**equation_params)
+        print(f"Initialized equation: {self.equation.name}")
 
         ansatz_cfg = cfg.ansatz
         ansatz_name = list(ansatz_cfg.keys())[0]

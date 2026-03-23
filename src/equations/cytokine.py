@@ -57,9 +57,9 @@ class Cytokine(Equation):
         """
         T, H, D, C = u
 
-        dTdt = self.alpha_T * T * (1 - T / self.K_T) - self.gamma_T * D / (D + self.IC50T) * T - self.beta_T * C * T
+        dTdt = self.alpha_T * T * (1 - T / self.K_T) - self.gamma_T * D * T - self.beta_T * C * T
 
-        dHdt = self.alpha_H * H * (1 - H / self.H_max) - self.gamma_H * D / (D + self.IC50H) * H
+        dHdt = self.alpha_H * H * (1 - H / self.H_max) - self.gamma_H * D * H
 
         dDdt =  - (self.k_a + self.k_e) * D + self.k_in * self._dose(t)
 
@@ -182,24 +182,24 @@ class CytokineFullQuantum(Cytokine):
 
         # Now we handle the Hill functions with a fitted polynomial approximation
         vals = np.linspace(0.01, 1.0, 100)
-        D_vals = vals / (vals + self.IC50T)
-        H1 = np.polyfit(vals, D_vals, 2)
+        #D_vals = vals / (vals + self.IC50T)
+        #H1 = np.polyfit(vals, D_vals, 2)
 
-        D_vals = vals / (vals + self.IC50H)
-        H2 = np.polyfit(vals, D_vals, 2)
+        #D_vals = vals / (vals + self.IC50H)
+        #H2 = np.polyfit(vals, D_vals, 2)
 
         T_vals = vals / (vals + self.K_T)
         H3 = np.polyfit(vals, T_vals, 3)
 
         # Formulation of the first Hill function term with ansatz diagonals
         # Constant term for H1
-        H1_diag1, thetas_H1_1 = make_parameterized_diagonal_circuit(n_qubits=2)
-        H1_param_map_1, H1_coeff1 = find_diagonal_parameters(np.array([-self.gamma_T * H1[0], 0, 0, 0]), thetas_H1_1)
-        H1_diag1.assign_parameters(H1_param_map_1, inplace=True)
+        #H1_diag1, thetas_H1_1 = make_parameterized_diagonal_circuit(n_qubits=2)
+        #H1_param_map_1, H1_coeff1 = find_diagonal_parameters(np.array([-self.gamma_T * H1[0], 0, 0, 0]), thetas_H1_1)
+        #H1_diag1.assign_parameters(H1_param_map_1, inplace=True)
 
         # Linear term for H1 with ansatz
         H1_diag2, thetas_H1_2 = make_parameterized_diagonal_circuit(n_qubits=2)
-        H1_param_map_2, H1_coeff2 = find_diagonal_parameters(np.array([-self.gamma_T * H1[1], 0, 0, 0]), thetas_H1_2)
+        H1_param_map_2, H1_coeff2 = find_diagonal_parameters(np.array([-self.gamma_T, 0, 0, 0]), thetas_H1_2)
         H1_diag2.assign_parameters(H1_param_map_2, inplace=True)
         ansatz_diag_H1_2, ansatz_params_H1_2 = make_ansatz_diagonal_circuit(n_qubits=2, ansatz_params=ansatz_cfg)
         ansatz_params_H1_2 = ParameterVector("theta1", len(ansatz_params_H1_2))
@@ -210,6 +210,7 @@ class CytokineFullQuantum(Cytokine):
         full_circuit_H1_1.compose(ansatz_diag_H1_2, qubits=[0,1,2,3], inplace=True)
         full_circuit_H1_1.x(1)
 
+        '''
         # Quadratic term for H1 with ansatz
         H1_diag3, thetas_H1_3 = make_parameterized_diagonal_circuit(n_qubits=2)
         H1_param_map_3, H1_coeff3 = find_diagonal_parameters(np.array([-self.gamma_T * H1[2], 0, 0, 0]), thetas_H1_3)
@@ -227,7 +228,7 @@ class CytokineFullQuantum(Cytokine):
         full_circuit_H1_2.compose(ansatz_diag_H1_4, qubits=[0,1,4,5], inplace=True)
         full_circuit_H1_2.x(1)
         
-        '''
+        
         # Cubic term for H1 with ansatz
         H1_diag4, thetas_H1_4 = make_parameterized_diagonal_circuit(n_qubits=2)
         H1_param_map_4, H1_coeff4 = find_diagonal_parameters(np.array([-self.gamma_T * H1[3], 0, 0, 0]), thetas_H1_4)
@@ -251,25 +252,26 @@ class CytokineFullQuantum(Cytokine):
         '''
         # Now for the Hill term in T
         # Constant term for H2
-        H2_diag1, thetas_H2_1 = make_parameterized_diagonal_circuit(n_qubits=2)
-        H2_param_map_1, H2_coeff1 = find_diagonal_parameters(np.array([0, -self.gamma_H * H2[0], 0, 0]), thetas_H2_1)
-        H2_diag1.assign_parameters(H2_param_map_1, inplace=True)
+        #H2_diag1, thetas_H2_1 = make_parameterized_diagonal_circuit(n_qubits=2)
+        #H2_param_map_1, H2_coeff1 = find_diagonal_parameters(np.array([0, -self.gamma_H * H2[0], 0, 0]), thetas_H2_1)
+        #H2_diag1.assign_parameters(H2_param_map_1, inplace=True)
 
         # Linear term for H2 with ansatz
         H2_diag2, thetas_H2_2 = make_parameterized_diagonal_circuit(n_qubits=2)
-        H2_param_map_2, H2_coeff2 = find_diagonal_parameters(np.array([0, -self.gamma_H * H2[1], 0, 0]), thetas_H2_2)
+        H2_param_map_2, H2_coeff2 = find_diagonal_parameters(np.array([0, -self.gamma_H, 0, 0]), thetas_H2_2)
         H2_diag2.assign_parameters(H2_param_map_2, inplace=True)
         ansatz_diag_H2_2, ansatz_params_H2_2 = make_ansatz_diagonal_circuit(n_qubits=2, ansatz_params=ansatz_cfg)
         ansatz_params_H2_2 = ParameterVector("theta1", len(ansatz_params_H2_2))
         ansatz_diag_H2_2 = ansatz_diag_H2_2.assign_parameters(ansatz_params_H2_2)
         full_circuit_H2_1 = qk.QuantumCircuit(5)
-        full_circuit_H2_1.compose(H2_diag1, qubits=[0,1,4], inplace=True)
+        full_circuit_H2_1.compose(H2_diag2, qubits=[0,1,4], inplace=True)
         full_circuit_H2_1.x(0)
         full_circuit_H2_1.x(1)
         full_circuit_H2_1.compose(ansatz_diag_H2_2, qubits=[0,1,2,3], inplace=True)
         full_circuit_H2_1.x(0)
         full_circuit_H2_1.x(1)
 
+        '''
         # Quadratic term for H2 with ansatz
         H2_diag3, thetas_H2_3 = make_parameterized_diagonal_circuit(n_qubits=2)
         H2_param_map_3, H2_coeff3 = find_diagonal_parameters(np.array([0, -self.gamma_H * H2[2], 0, 0]), thetas_H2_3)
@@ -289,7 +291,7 @@ class CytokineFullQuantum(Cytokine):
         full_circuit_H2_2.x(0)
         full_circuit_H2_2.x(1)
         
-        '''
+        
         # Qubic term for H2 with ansatz
         H2_diag4, thetas_H2_4 = make_parameterized_diagonal_circuit(n_qubits=2)
         H2_param_map_4, H2_coeff4 = find_diagonal_parameters(np.array([0, -self.gamma_H * H2[3],0, 0]), thetas_H2_4)
@@ -364,14 +366,14 @@ class CytokineFullQuantum(Cytokine):
             QuantumTerm(diag_circuit_3, find_parameters_term3, "constant"),
             QuantumTerm(full_circuit_3, lambda t, u: ({}, coeff4), "ansatz", 1),
 
-            QuantumTerm(H1_diag1, lambda t, u: ({}, H1_coeff1)),
+            #QuantumTerm(H1_diag1, lambda t, u: ({}, H1_coeff1)),
             QuantumTerm(full_circuit_H1_1, lambda t, u: ({}, H1_coeff2), "ansatz", 1),
-            QuantumTerm(full_circuit_H1_2, lambda t, u: ({}, H1_coeff3), "ansatz", 2),
+            #QuantumTerm(full_circuit_H1_2, lambda t, u: ({}, H1_coeff3), "ansatz", 2),
             #QuantumTerm(full_circuit_H1_3, lambda t, u: ({}, H1_coeff4), "ansatz", 3),
 
-            QuantumTerm(H2_diag1, lambda t, u: ({}, H2_coeff1)),
+            #QuantumTerm(H2_diag1, lambda t, u: ({}, H2_coeff1)),
             QuantumTerm(full_circuit_H2_1, lambda t, u: ({}, H2_coeff2), "ansatz", 1),
-            QuantumTerm(full_circuit_H2_2, lambda t, u: ({}, H2_coeff3), "ansatz", 2),
+            #QuantumTerm(full_circuit_H2_2, lambda t, u: ({}, H2_coeff3), "ansatz", 2),
             #QuantumTerm(full_circuit_H2_3, lambda t, u: ({}, H2_coeff4), "ansatz", 3),
 
             QuantumTerm(H3_diag1, lambda t, u: ({}, H3_coeff1), "constant"),
@@ -384,7 +386,7 @@ class CytokineFullQuantum(Cytokine):
 if __name__ == "__main__":
     ck = CytokineFullQuantum()
     t = 0.0
-    u = np.array([0.1, 1.0, 0.0, 0.1])
+    u = np.array([0.1, 1.0, 1.0, 0.1])
     ansatz_cfg = {
         "ULA": {
             "n_qubits": 2,
@@ -411,7 +413,9 @@ if __name__ == "__main__":
         
         circuit.draw('mpl', style={'fontsize': 8}).savefig(f"cytokine_term_{i}.png")
         print(coeff)
-        print(qk.quantum_info.Operator(circuit).data.round(4)[0:4,0:4])
+        op = qk.quantum_info.Operator(circuit).data.round(4)[0:4,0:4]
+        print(op)
+        print(u @ op)
     ula, ansatz_params = ULA(2, 2)
     ula.assign_parameters(lambda_vals, inplace=True)
     print(qk.quantum_info.Operator(ula).data.round(4)[0:4,0:4])

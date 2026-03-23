@@ -20,8 +20,14 @@ def main(cfg):
         qforward.step()
         states.append(qforward.current_state)
 
-    qforward.equation.plot_results(t, states, name=f"{cfg.name}.png", u_num=sol.y)
+    qforward.equation.plot_results(t, states, name=f"plots/{cfg.name}.png", u_num=sol.y)
 
+    # save the results from the numerical solution
+    np.savez(f"results/{cfg.name}_numerical.npz", t=t, x=sol.y)
+
+    # save the results from the quantum forward simulation
+    states = np.array(states).T
+    np.savez(f"results/{cfg.name}_quantum.npz", t=t, x=states)
 
 
 if __name__ == "__main__":
