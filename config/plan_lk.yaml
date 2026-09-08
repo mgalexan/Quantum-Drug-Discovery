@@ -1,0 +1,19 @@
+name: lk-final
+
+initial_conditions: [0.8, 0.6]
+optimizer_budget: 1000
+n_steps: 100
+
+equation: 
+  LotkaVolterraFullQuantum: {}
+ansatz:
+  ULA:
+    n_qubits: 1
+    depth: 1
+
+cost:
+  EulerCost:
+    tau: 0.002
+    backend_type: exact
+    shots: 1000
+

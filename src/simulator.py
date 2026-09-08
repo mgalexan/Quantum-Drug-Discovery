@@ -1,4 +1,5 @@
 from equations.base_equation import Equation, QuantumTerm
+from scipy.optimize import minimize
 from costs.base_cost import BaseCost
 import qiskit as qk
 from omegaconf import DictConfig
@@ -19,6 +20,7 @@ from equations.lotka_volterra import LotkaVolterra, LotkaVolterraConstant, Lotka
 from equations.chemotherapy import Chemotherapy, AltChemotherapy
 from equations.cytokine import Cytokine, CytokineFullQuantum
 from equations.cellsignal import CellSignal
+from equations.nanoparticle import Nanoparticle
 
 
 
@@ -54,6 +56,7 @@ class QuantumForward():
 
         self.workers = cfg.get("workers", 1)
         self.optimizer_budget = cfg.get("optimizer_budget", 1000)
+        self.optimizer_method = cfg.get("optimizer_method", "NGOpt")
 
         self._compile()
     
@@ -90,6 +93,7 @@ class QuantumForward():
         self.ic_lambdas = [lambda_0] + list(ic_result.value)
         print(self.ic_lambdas)
         self.current_lambdas = self.ic_lambdas
+        self.lambda_history = [self.ic_lambdas]
 
         # Compute the first state
         param_map = {self.ansatz_params[i]: self.ic_lambdas[i+1] for i in range(len(self.ansatz_params))}
@@ -107,18 +111,25 @@ class QuantumForward():
         # Cost function at current step
         cost_step = partial(self.cost.compute_cost, lambdas_prev= self.current_lambdas, u_prev=self.current_state, t=self.current_time)
         # Optimizer
-        optimizer = ng.optimizers.NGOpt(parametrization=len(self.current_lambdas), budget=self.optimizer_budget, num_workers=self.workers)
 
-        # Add initial guess to previous step
-        optimizer.value = self.current_lambdas
-        result = optimizer.minimize(cost_step)
+        if self.optimizer_method == "NGOpt":
+            optimizer = ng.optimizers.NGOpt(parametrization=len(self.current_lambdas), budget=self.optimizer_budget, num_workers=self.workers)
+
+            # Add initial guess to previous step
+            optimizer.value = self.current_lambdas
+            result = optimizer.minimize(cost_step)
+            
+            self.current_lambdas = result.value
+        elif self.optimizer_method == "scipy":
+            result = minimize(cost_step, self.current_lambdas, method='nelder-mead', options={'maxiter': self.optimizer_budget})
+            self.current_lambdas = result.x
         
-        self.current_lambdas = result.value
         param_map = {self.ansatz_params[i]: self.current_lambdas[i+1] for i in range(len(self.ansatz_params))}
         ansatz_bound = self.ansatz.assign_parameters(param_map, inplace=False)
         op = qk.quantum_info.Operator(ansatz_bound)
         statevector = op.data[:, 0] * self.current_lambdas[0]
         self.current_state = np.real(statevector)
+        self.lambda_history.append(self.current_lambdas)
         self.current_time += self.tau
                 
     

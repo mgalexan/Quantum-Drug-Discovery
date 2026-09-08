@@ -1,0 +1,18 @@
+name: ck-final
+
+initial_conditions: [0.1, 1.0, 0.0, 0.1]
+optimizer_budget: 4000
+n_steps: 500
+
+equation: 
+  Cytokine: {}
+ansatz:
+  ULA:
+    n_qubits: 2
+    depth: 2
+
+cost:
+  EulerCost:
+    tau: 0.01
+    backend_type: exact
+

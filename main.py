@@ -29,6 +29,9 @@ def main(cfg):
     states = np.array(states).T
     np.savez(f"results/{cfg.name}_quantum.npz", t=t, x=states)
 
+    lambdas = np.array(qforward.lambda_history).T
+    np.savez(f"results/{cfg.name}_lambdas.npz", t=t, lambdas=lambdas)
+
 
 if __name__ == "__main__":
     main()

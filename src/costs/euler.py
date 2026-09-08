@@ -3,6 +3,7 @@ from equations.base_equation import Equation, QuantumTerm
 import qiskit as qk
 from qiskit.circuit import ParameterVector
 from qiskit_aer import AerSimulator
+from qiskit_ibm_runtime.fake_provider import FakeBoston
 import numpy as np
 from omegaconf import DictConfig
 from collections import defaultdict
@@ -22,8 +23,16 @@ class EulerCost(BaseCost):
         self.tau = cfg.tau
         if cfg.backend_type == "aer_simulator":
             self.backend = AerSimulator()
+        elif cfg.backend_type == "fakeboston":
+            self.backend = FakeBoston()
+
         elif cfg.backend_type == "exact":
             self.backend = None
+
+        try:
+            self.shots = cfg.shots
+        except AttributeError:
+            self.shots = 8192
 
 
     def compile_with_ansatz(self, ansatz: qk.QuantumCircuit, ansatz_params, ansatz_cfg: DictConfig = None) -> None:
@@ -146,7 +155,7 @@ class EulerCost(BaseCost):
                     bound_circuit = bound_circuit.assign_parameters(ansatz_prev_param_dict, inplace=False)
                     vals = ansatz_prev_param_dict.values()
                     by_name = defaultdict(list)
-                    for p in circuit.parameters:
+                    for p in bound_circuit.parameters:
                         by_name[p.name.split("[")[0]].append(p)
 
                     bind_dict = {}
@@ -154,9 +163,9 @@ class EulerCost(BaseCost):
                         if name.startswith("theta"):
                             for p, v in zip(sorted(params, key=lambda x: x.name), vals):
                                 bind_dict[p] = v
+                    bound_circuit = bound_circuit.assign_parameters(bind_dict, inplace=False)
 
-
-                job = self.backend.run(bound_circuit, shots=8192)
+                job = self.backend.run(bound_circuit, shots=self.shots)
                 result = job.result()
                 counts = result.get_counts()
                 # Estimate the expectation value from measurement results
@@ -265,7 +274,7 @@ if __name__ == "__main__":
     
     for i, term in enumerate(euler_cost.combined_circuits):
         circuit = term.circuit
-        # Use Cytokine initial state for testing
+        # Use LK initial state for testing
         params, coeff = term.find_parameters(0.0, np.array([0.6, 0.8]))
         param_map = {ula_params[j]: lambdas[j + 1] for j in range(len(ula_params))}
         param_map_prev = {euler_cost.ansatz_prev_params[j]: lambdas_prev[j + 1] for j in range(len(ula_params))}
